@@ -10,6 +10,8 @@ import {
   GraphQLObjectType,
   GraphQLSchema,
   GraphQLString,
+  GraphQLFloat,
+  GraphQLInputObjectType
 } from 'graphql';
 import { UUIDType } from './types/uuid.js';
 
@@ -177,10 +179,202 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
     }),
   });
 
-  /*1.1 npm run test-queries*/
+/*1.1 npm run test-queries*/
+
+/*1.2 npm run test-mutations*/
+
+    const createInputType = (name: string, fields: Record<string, any>) => {
+        return new GraphQLInputObjectType({
+            name,
+            fields,
+        });
+    };
+
+    const ChangePostInput = createInputType('ChangePostInput', 
+      {
+        title: { type: GraphQLString },
+        content: { type: GraphQLString },
+      }
+    );
+
+    const ChangeProfileInput = createInputType('ChangeProfileInput', 
+      {
+        isMale: { type: GraphQLBoolean },
+        yearOfBirth: { type: GraphQLInt },
+        memberTypeId: { type: MemberTypeId },
+      }
+    );
+
+    const ChangeUserInput = createInputType('ChangeUserInput', 
+      {
+        name: { type: GraphQLString },
+        balance: { type: GraphQLFloat },
+      }
+   );
+    
+    const CreatePostInput = createInputType('CreatePostInput', 
+      {
+        title: { type: new GraphQLNonNull(GraphQLString) },
+        content: { type: new GraphQLNonNull(GraphQLString) },
+        authorId: { type: new GraphQLNonNull(UUIDType) },
+      }
+    );
+
+    const CreateProfileInput = createInputType('CreateProfileInput', 
+      {
+        isMale: { type: new GraphQLNonNull(GraphQLBoolean) },
+        yearOfBirth: { type: new GraphQLNonNull(GraphQLInt) },
+        memberTypeId: { type: new GraphQLNonNull(MemberTypeId) },
+        userId: { type: new GraphQLNonNull(UUIDType) },
+      }
+    );
+
+    const CreateUserInput = createInputType('CreateUserInput', 
+      {
+        name: { type: new GraphQLNonNull(GraphQLString) },
+        balance: { type: new GraphQLNonNull(GraphQLFloat) },
+      }
+    );
+
+    const Mutations = new GraphQLObjectType({
+      name: 'Mutations',
+      fields: {
+        createPost: {
+            type: new GraphQLNonNull(Post),
+            args: {
+                dto: { type: new GraphQLNonNull(CreatePostInput) },
+            },
+            resolve: async (_, { dto }) => {
+              return await prisma.post.create({ data: dto });
+            },
+        },
+
+        createUser: {
+            type: new GraphQLNonNull(User),
+            args: {
+                dto: { type: new GraphQLNonNull(CreateUserInput) },
+            },
+            resolve: async (_, { dto }) => {
+              return await prisma.user.create({ data: dto });  
+            },
+        },
+
+        createProfile: {
+            type: new GraphQLNonNull(Profile),
+            args: {
+                dto: { type: CreateProfileInput },
+            },
+            resolve: async (_, { dto }) => {
+              return await prisma.profile.create({ data: dto });
+            },
+        },
+
+        changePost: {
+            type: new GraphQLNonNull(Post),
+            args: {
+                id: { type: new GraphQLNonNull(UUIDType) },
+                dto: { type: new GraphQLNonNull(ChangePostInput) },
+            },
+            resolve: async (_, { id, dto }) => {
+              return await prisma.post.update({ where: { id }, data: dto });
+            },
+        },
+
+        changeProfile: {
+            type: new GraphQLNonNull(Profile),
+            args: {
+                id: { type: new GraphQLNonNull(UUIDType) },
+                dto: { type: new GraphQLNonNull(ChangeProfileInput) },
+            },
+            resolve: async (_, { id, dto }) => {
+              return await prisma.profile.update({ where: { id }, data: dto });  
+            },
+        },
+
+        changeUser: {
+            type: new GraphQLNonNull(User),
+            args: {
+                id: { type: new GraphQLNonNull(UUIDType) },
+                dto: { type: new GraphQLNonNull(ChangeUserInput) },
+            },
+            resolve: async (_, { id, dto }) => {
+              return await prisma.user.update({ where: { id }, data: dto });
+            },
+        },
+
+        deleteUser: {
+            type: new GraphQLNonNull(GraphQLString),
+            args: {
+              id: { type: new GraphQLNonNull(UUIDType) },
+            },
+            resolve: async (_, { id }) => {
+              await prisma.user.delete({ where: { id } });
+              return 'User del';
+            },
+        },
+
+        deletePost: {
+            type: new GraphQLNonNull(GraphQLString),
+            args: {
+                id: { type: new GraphQLNonNull(UUIDType) },
+            },
+            resolve: async (_, { id }) => {
+              await prisma.post.delete({ where: { id } });
+              return 'Post del';
+            },
+        },
+
+        deleteProfile: {
+            type: new GraphQLNonNull(GraphQLString),
+            args: {
+                id: { type: new GraphQLNonNull(UUIDType) },
+            },
+            resolve: async (_, { id }) => {
+              await prisma.profile.delete({ where: { id } });
+              return 'Profile del';
+            },
+        },
+
+        subscribeTo: {
+            type: new GraphQLNonNull(GraphQLString),
+            args: {
+                userId: { type: new GraphQLNonNull(UUIDType) },
+                authorId: { type: new GraphQLNonNull(UUIDType) },
+            },
+            resolve: async (_, { userId, authorId }) => {
+              await prisma.subscribersOnAuthors.create({
+                  data: { subscriberId: userId, authorId },
+              });
+              return 'Subscribed';
+            },
+        },
+
+        unsubscribeFrom: {
+            type: new GraphQLNonNull(GraphQLString),
+            args: {
+                userId: { type: new GraphQLNonNull(UUIDType) },
+                authorId: { type: new GraphQLNonNull(UUIDType) },
+            },
+            resolve: async (_, { userId, authorId }) => {
+              await prisma.subscribersOnAuthors.delete({
+                  where: {
+                      subscriberId_authorId: {
+                          subscriberId: userId,
+                          authorId,
+                      },
+                  },
+              });
+              return 'Unsubscribed';
+            },
+        },
+      },
+    });
+
+/*1.2 npm run test-mutations*/
 
   const schema = new GraphQLSchema({
     query: Query,
+    mutation: Mutations,
   });
 
   fastify.route({
